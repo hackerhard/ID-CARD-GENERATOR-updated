@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Student ID Card Generator — Bulk + Single</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .id-card {
+      background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.08);
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .id-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #059669, #10b981, #34d399);
+    }
+    .form-input:focus { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+    @media print {
+      .no-print { display:none !important; }
+      body { background: white !important; }
+      .cards-print-grid { display:block !important; }
+      .card-wrap { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-gray-800">Student ID Card Generator</h1>
+      <p class="text-gray-600">Single preview + Bulk CSV → Generate printable cards</p>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+      <!-- Form -->
+      <div class="lg:col-span-1 bg-white rounded-2xl p-6 shadow no-print">
+        <h2 class="text-xl font-semibold mb-4">Single Student</h2>
+        <form id="studentForm" class="space-y-3">
+          <input id="studentName" class="form-input w-full px-3 py-2 border rounded" placeholder="Student Name" required>
+          <input id="studentId" class="form-input w-full px-3 py-2 border rounded" placeholder="Student ID" required>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="studentClass" class="form-input px-3 py-2 border rounded" placeholder="Class / Grade" required>
+            <input id="studentSection" class="form-input px-3 py-2 border rounded" placeholder="Section" required>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="dob" type="date" class="form-input px-3 py-2 border rounded" required>
+            <select id="bloodGroup" class="form-input px-3 py-2 border rounded" required>
+              <option value="">Blood Group</option>
+              <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+              <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+            </select>
+          </div>
+          <input id="contactNumber" class="form-input w-full px-3 py-2 border rounded" placeholder="Contact Number" required>
+          <input id="institutionName" class="form-input w-full px-3 py-2 border rounded" placeholder="Institution Name" value="Excellence Educational Institute">
+          <input id="institutionSlogan" class="form-input w-full px-3 py-2 border rounded" placeholder="Institution Slogan" value="Excellence in Education">
+          <label class="text-sm text-gray-600">Photo (optional)</label>
+          <input id="studentPhoto" type="file" accept="image/*" class="w-full">
+          <label class="text-sm text-gray-600">Logo (optional)</label>
+          <input id="institutionLogo" type="file" accept="image/*" class="w-full">
+          <div class="flex gap-2 mt-3">
+            <button type="button" onclick="generateCard()" class="flex-1 bg-blue-600 text-white py-2 rounded">Generate Single</button>
+            <button type="button" onclick="clearForm()" class="flex-1 border rounded py-2">Clear</button>
+          </div>
+        </form>
+
+        <hr class="my-4">
+
+        <h2 class="text-xl font-semibold mb-3">Bulk CSV</h2>
+        <p class="text-sm text-gray-600 mb-2">CSV format (header required):</p>
+        <pre class="text-xs bg-slate-50 p-2 rounded text-gray-700">StudentName,StudentID,GuardianName,DOB,Address,Gender,BloodGroup,ContactNumber,Class,Section,RollNumber,AdmissionDate</pre>
+        <input id="bulkUpload" type="file" accept=".csv" class="w-full mt-3">
+        <div class="flex gap-2 mt-3">
+          <button onclick="processBulkUpload()" class="flex-1 bg-emerald-600 text-white py-2 rounded">Generate From CSV</button>
+          <button onclick="downloadTemplate()" class="flex-1 border rounded py-2">Download Template</button>
+        </div>
+        <p class="text-sm text-gray-500 mt-3">Note: For bulk, photo/logo per-row is not supported in this CSV version. You can later edit cards manually if needed.</p>
+      </div>
+
+      <!-- Preview -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="bg-white rounded-2xl p-6 shadow">
+          <h3 class="font-semibold mb-3">ID Card Preview</h3>
+          <div id="idCard" class="id-card mx-auto" style="width:300px;height:460px;position:relative;">
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 text-white text-center">
+              <div id="logoContainer" class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-2">
+                <svg id="defaultLogo" class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L23 9l-11-6zM5 13.18l7 3.82 7-3.82V11L12 15 5 11v2.18z"/></svg>
+                <img id="customLogo" class="w-10 h-10 rounded-full object-cover hidden" alt="logo">
+              </div>
+              <h3 id="cardInstitution" class="text-lg font-semibold">Institution</h3>
+              <p id="cardSlogan" class="text-sm opacity-90">Slogan</p>
+            </div>
+            <div class="p-4 text-center">
+              <img id="cardPhoto" class="w-28 h-28 rounded-full mx-auto mb-2 object-cover border-4 border-emerald-500" src="" alt="Student Photo" />
+              <h4 id="cardName" class="text-lg font-bold">Student Name</h4>
+              <p id="cardId" class="text-sm text-gray-600">ID: XXXXX</p>
+              <p id="cardClass" class="text-sm">Class / Section</p>
+              <p id="cardDOB" class="text-sm">DOB: --/--/----</p>
+              <p id="cardBlood" class="text-sm">Blood: --</p>
+              <p id="cardContact" class="text-sm">Phone: --</p>
+            </div>
+          </div>
+          <div class="mt-3 flex gap-2 no-print">
+            <button onclick="window.print()" class="bg-pink-500 text-white rounded px-4 py-2">Print</button>
+            <button onclick="addPreviewToBulk()" class="border rounded px-4 py-2">Add to Batch</button>
+            <button id="downloadBatchBtn" onclick="downloadBatch()" class="border rounded px-4 py-2 hidden">Download Batch JSON</button>
+          </div>
+        </div>
+
+        <!-- Bulk generated cards -->
+        <div class="bg-white rounded-2xl p-6 shadow">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="font-semibold">Generated Cards (Bulk)</h3>
+            <div class="flex gap-2">
+              <button id="printAllBtn" onclick="printAll()" class="bg-red-600 text-white px-3 py-1 rounded no-print hidden">Print All</button>
+              <button id="clearAllBtn" onclick="clearAll()" class="border px-3 py-1 rounded no-print hidden">Clear All</button>
+            </div>
+          </div>
+
+          <div id="cardsContainer" class="grid cards-print-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- generated cards injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="text-center text-sm text-gray-500 mt-6">Save this <strong>index.html</strong> to a GitHub repo and enable GitHub Pages (branch: main) to host.</footer>
+  </div>
+
+<script>
+const batch = [];
+
+function generateCard() {
+  // read fields and update preview
+  const name = document.getElementById('studentName').value || 'Student Name';
+  const id = document.getElementById('studentId').value || 'XXXXX';
+  const cls = document.getElementById('studentClass').value || '--';
+  const sec = document.getElementById('studentSection').value || '--';
+  const dob = document.getElementById('dob').value || '--';
+  const blood = document.getElementById('bloodGroup').value || '--';
+  const phone = document.getElementById('contactNumber').value || '--';
+  const inst = document.getElementById('institutionName').value || 'Institution';
+  const slogan = document.getElementById('institutionSlogan').value || '';
+
+  document.getElementById('cardName').textContent = name;
+  document.getElementById('cardId').textContent = 'ID: ' + id;
+  document.getElementById('cardClass').textContent = cls + ' / ' + sec;
+  document.getElementById('cardDOB').textContent = 'DOB: ' + dob;
+  document.getElementById('cardBlood').textContent = 'Blood: ' + blood;
+  document.getElementById('cardContact').textContent = 'Phone: ' + phone;
+  document.getElementById('cardInstitution').textContent = inst;
+  document.getElementById('cardSlogan').textContent = slogan;
+
+  // photo
+  const photoFile = document.getElementById('studentPhoto').files[0];
+  if (photoFile) {
+    const reader = new FileReader();
+    reader.onload = e => document.getElementById('cardPhoto').src = e.target.result;
+    reader.readAsDataURL(photoFile);
+  } else {
+    document.getElementById('cardPhoto').src = '';
+  }
+
+  // logo
+  const logoFile = document.getElementById('institutionLogo').files[0];
+  if (logoFile) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('customLogo').src = e.target.result;
+      document.getElementById('customLogo').classList.remove('hidden');
+      document.getElementById('defaultLogo').classList.add('hidden');
+    };
+    reader.readAsDataURL(logoFile);
+  } else {
+    document.getElementById('customLogo').classList.add('hidden');
+    document.getElementById('defaultLogo').classList.remove('hidden');
+  }
+}
+
+function clearForm() {
+  document.getElementById('studentForm').reset();
+  // clear preview image and logo
+  document.getElementById('cardPhoto').src = '';
+  document.getElementById('customLogo').classList.add('hidden');
+  document.getElementById('defaultLogo').classList.remove('hidden');
+  generateCard();
+}
+
+// add current preview into batch
+function addPreviewToBulk() {
+  const item = {
+    StudentName: document.getElementById('cardName').textContent,
+    StudentID: document.getElementById('studentId').value || '',
+    Class: document.getElementById('studentClass').value || '',
+    Section: document.getElementById('studentSection').value || '',
+    DOB: document.getElementById('dob').value || '',
+    BloodGroup: document.getElementById('bloodGroup').value || '',
+    ContactNumber: document.getElementById('contactNumber').value || '',
+    InstitutionName: document.getElementById('institutionName').value || '',
+    InstitutionSlogan: document.getElementById('institutionSlogan').value || ''
+  };
+  batch.push(item);
+  renderBatch();
+  document.getElementById('downloadBatchBtn').classList.remove('hidden');
+}
+
+function renderBatch() {
+  const container = document.getElementById('cardsContainer');
+  container.innerHTML = '';
+  if (batch.length === 0) {
+    document.getElementById('printAllBtn').classList.add('hidden');
+    document.getElementById('clearAllBtn').classList.add('hidden');
+    return;
+  }
+  document.getElementById('printAllBtn').classList.remove('hidden');
+  document.getElementById('clearAllBtn').classList.remove('hidden');
+
+  batch.forEach((b, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'card-wrap';
+    wrap.innerHTML = cardHTML(b);
+    container.appendChild(wrap);
+  });
+}
+
+function cardHTML(b) {
+  return `
+    <div class="id-card p-3 relative" style="min-height:420px;">
+      <div class="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 text-white text-center">
+        <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-2">
+          <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L23 9l-11-6zM5 13.18l7 3.82 7-3.82V11L12 15 5 11v2.18z"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold">${escapeHtml(b.InstitutionName || '')}</h3>
+        <p class="text-sm opacity-90">${escapeHtml(b.InstitutionSlogan || '')}</p>
+      </div>
+      <div class="p-4 text-center">
+        <div class="w-28 h-28 bg-gray-100 rounded-full mx-auto mb-2 flex items-center justify-center text-gray-400">Photo</div>
+        <h4 class="text-lg font-bold">${escapeHtml(b.StudentName || '')}</h4>
+        <p class="text-sm text-gray-600">ID: ${escapeHtml(b.StudentID || '')}</p>
+        <p class="text-sm">${escapeHtml(b.Class || '')} / ${escapeHtml(b.Section || '')}</p>
+        <p class="text-sm">DOB: ${escapeHtml(b.DOB || '')}</p>
+        <p class="text-sm">Blood: ${escapeHtml(b.BloodGroup || '')}</p>
+        <p class="text-sm">Phone: ${escapeHtml(b.ContactNumber || '')}</p>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+
+function printAll() {
+  // open print for the current page; CSS @media print will handle layout
+  window.print();
+}
+
+function clearAll() {
+  if (!confirm('Clear all generated cards?')) return;
+  batch.length = 0;
+  renderBatch();
+  document.getElementById('downloadBatchBtn').classList.add('hidden');
+}
+
+// download batch as JSON for later editing
+function downloadBatch() {
+  const data = JSON.stringify(batch, null, 2);
+  const blob = new Blob([data], {type: 'application/json'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'student_batch.json';
+  link.click();
+}
+
+// CSV handling
+function processBulkUpload() {
+  const file = document.getElementById('bulkUpload').files[0];
+  if (!file) return alert('Please select a CSV file to upload.');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const rows = text.split(/\r?\n/).filter(r=>r.trim().length>0);
+    const header = rows[0].split(',').map(h=>h.trim());
+    const expected = ['StudentName','StudentID','GuardianName','DOB','Address','Gender','BloodGroup','ContactNumber','Class','Section','RollNumber','AdmissionDate'];
+    // simple header check (case-insensitive)
+    const headerLower = header.map(h=>h.toLowerCase());
+    const ok = expected.every(exp => headerLower.includes(exp.toLowerCase()));
+    if (!ok) {
+      if (!confirm('CSV header does not match expected format. Continue trying to parse rows?')) return;
+    }
+    for (let i=1;i<rows.length;i++){
+      const cols = parseCSVRow(rows[i]);
+      if (cols.length < 3) continue;
+      // map columns by header index if possible
+      const rowObj = {};
+      header.forEach((h, idx) => rowObj[h.trim()] = cols[idx] ? cols[idx].trim() : '');
+      // push minimal fields to batch
+      batch.push({
+        StudentName: rowObj['StudentName'] || rowObj['studentname'] || '',
+        StudentID: rowObj['StudentID'] || rowObj['studentid'] || '',
+        Class: rowObj['Class'] || '',
+        Section: rowObj['Section'] || '',
+        DOB: rowObj['DOB'] || '',
+        BloodGroup: rowObj['BloodGroup'] || '',
+        ContactNumber: rowObj['ContactNumber'] || '',
+        InstitutionName: document.getElementById('institutionName').value || '',
+        InstitutionSlogan: document.getElementById('institutionSlogan').value || ''
+      });
+    }
+    renderBatch();
+    alert('CSV processed — generated ' + batch.length + ' cards in batch.');
+  };
+  reader.readAsText(file);
+}
+
+// naive CSV row parser that respects quoted commas
+function parseCSVRow(row) {
+  const res = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i=0;i<row.length;i++){
+    const ch = row[i];
+    if (ch === '"' ) { inQuotes = !inQuotes; continue; }
+    if (ch === ',' && !inQuotes) { res.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  res.push(cur);
+  return res;
+}
+
+function downloadTemplate() {
+  const csv = 'StudentName,StudentID,GuardianName,DOB,Address,Gender,BloodGroup,ContactNumber,Class,Section,RollNumber,AdmissionDate\n';
+  const blob = new Blob([csv], {type:'text/csv'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'student_template.csv';
+  link.click();
+}
+
+// initialize preview defaults
+generateCard();
+
+</script>
+</body>
+</html>
